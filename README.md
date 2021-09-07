@@ -1,5 +1,5 @@
 
-#geniepool-etl
+# geniepool-etl
 
 Spark-based ETL to import VCF files into the GeniePool data lake.
 
