@@ -38,7 +38,6 @@ public class ImportVcfToDataLakeByRanges {
         return table;
     }
 
-
     static Dataset getMutationsByIndex(SparkSession spark, String inputPath){
 
         Dataset raw = getRawInput(spark, inputPath);
