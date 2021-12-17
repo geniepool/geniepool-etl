@@ -4,6 +4,9 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
+import scala.collection.JavaConversions;
+
+import java.util.Arrays;
 
 import static org.apache.spark.sql.functions.*;
 
@@ -16,10 +19,11 @@ public class ImportVcfToDataLakeByRanges {
         String inputPath = args[0];
         String outputPath = args[1];
         String statusPath = args[2];
+        String impactPath = args[3];
 
         SparkSession sparkSession = SparkSession.builder().appName(ImportVcfToDataLakeByRanges.class.getName()).getOrCreate();
 
-        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath);
+        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath);
 
         writeToDataLake(result, outputPath);
 
@@ -27,15 +31,32 @@ public class ImportVcfToDataLakeByRanges {
 
     }
 
-    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath){
+    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath){
 
         Dataset table = getMutationsByIndex(spark, inputPath);
 
-        table = table
+        Dataset impact = spark.read().option("sep", "\t").option("header", "true").csv(impactPath);
+        impact = impact.dropDuplicates("chrom", "pos","ref","alt");
+
+        Dataset tableWithImpact = table.join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
+        tableWithImpact = tableWithImpact.withColumn("impact", trim(col("IMPACT")));
+
+        tableWithImpact.printSchema();
+        tableWithImpact.show();
+
+        tableWithImpact =  tableWithImpact
+                .groupBy("chrom", "pos","ref","alt", "impact")
+                .agg(collect_set("homo-srr").as("hom"), (collect_set("hetero-srr").as("het")));
+
+        tableWithImpact = tableWithImpact
+                .withColumn("resp", struct("ref", "alt", "impact", "hom", "het"))
+                .drop("hom", "het");
+
+        tableWithImpact = tableWithImpact
                 .withColumn("pos_bucket", floor(col("pos").divide(lit(1_000_000))))
                 .groupBy("chrom", "pos_bucket", "pos").agg(collect_set(col("resp")).as("entries"));
 
-        return table;
+        return tableWithImpact;
     }
 
     static Dataset getMutationsByIndex(SparkSession spark, String inputPath){
@@ -54,14 +75,6 @@ public class ImportVcfToDataLakeByRanges {
                 .withColumn("homo-srr", when(col("homo"), col("srr")))
                 .withColumn("hetero-srr", when(not(col("homo")), col("srr")))
                 .drop("homo");
-
-        table =  table
-                .groupBy("chrom", "pos","ref","alt")
-                .agg(collect_set("homo-srr").as("hom"), (collect_set("hetero-srr").as("het")));
-
-        table = table
-                .withColumn("resp", struct("ref", "alt", "hom", "het"))
-                .drop("hom", "het");
 
         return table;
 

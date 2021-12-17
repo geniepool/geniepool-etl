@@ -3,7 +3,9 @@ package spark;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -16,17 +18,18 @@ public class ImportVcfToDataLakeByRangesTest {
     }
 
     @Test
-    public void convertVcfsToDatalakeFormatTest(){
+    public void convertVcfsToDatalakeFormatWithImpactTest(){
 
-        SparkSession spark = SparkSession.builder().appName("importVcfToDataLakeTest").master("local[*]").getOrCreate();
+        SparkSession spark = SparkSession.builder().appName("convertVcfsToDatalakeFormatWithImpactTest").master("local[*]").getOrCreate();
 
-        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/");
+        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv");
 
         Assert.assertEquals(1622, result19.count());
 
         result19.printSchema();
 
-        result19.show();
+        Assert.assertEquals("we should keep only one impact", 1,
+                result19.where("chrom = 'chr1' and pos = 11301714").select(functions.size(functions.col("entries"))).as(Encoders.INT()).collectAsList().get(0));
 
     }
 
@@ -35,7 +38,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         SparkSession spark = SparkSession.builder().appName("ImportVcfToDataLakeByRangesTest").master("local[*]").getOrCreate();
 
-        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/");
+        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
