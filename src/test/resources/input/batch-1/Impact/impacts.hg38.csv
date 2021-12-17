@@ -1,3 +1,3 @@
 CHROM	POS	REF	ALT	IMPACT
-chr2	25234482	C	T	impact 1 test
-chr2	25235677	C	T	impact 2 test
+2	25234482	C	T	impact 1 test
+2	25235677	C	T	impact 2 test

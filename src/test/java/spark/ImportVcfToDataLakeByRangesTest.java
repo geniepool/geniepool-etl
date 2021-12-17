@@ -6,6 +6,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -32,6 +33,10 @@ public class ImportVcfToDataLakeByRangesTest {
         result19.printSchema();
 
         result19.show(false);
+
+        Assert.assertTrue(
+                ((String)result19.where("chrom = 'chr1' and pos = 11301714")
+                        .select(functions.col("entries").cast(DataTypes.StringType)).as(Encoders.STRING()).collectAsList().get(0)).contains("impact"));
 
     }
 

@@ -36,6 +36,7 @@ public class ImportVcfToDataLakeByRanges {
         Dataset table = getMutationsByIndex(spark, inputPath);
 
         Dataset impact = spark.read().option("sep", "\t").option("header", "true").csv(impactPath);
+        impact = impact.withColumn("chrom", concat(lit("chr"), upper(col("chrom")))); //same format as in vcf
         impact = impact.dropDuplicates("chrom", "pos","ref","alt");
 
         Dataset tableWithImpact = table.join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
