@@ -41,9 +41,6 @@ public class ImportVcfToDataLakeByRanges {
         Dataset tableWithImpact = table.join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
         tableWithImpact = tableWithImpact.withColumn("impact", trim(col("IMPACT")));
 
-        tableWithImpact.printSchema();
-        tableWithImpact.show();
-
         tableWithImpact =  tableWithImpact
                 .groupBy("chrom", "pos","ref","alt", "impact")
                 .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
