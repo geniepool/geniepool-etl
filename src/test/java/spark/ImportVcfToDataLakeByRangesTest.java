@@ -26,10 +26,12 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Assert.assertEquals(1622, result19.count());
 
-        result19.printSchema();
-
         Assert.assertEquals("we should keep only one impact", 1,
                 result19.where("chrom = 'chr1' and pos = 11301714").select(functions.size(functions.col("entries"))).as(Encoders.INT()).collectAsList().get(0));
+
+        result19.printSchema();
+
+        result19.show(false);
 
     }
 
@@ -86,5 +88,17 @@ public class ImportVcfToDataLakeByRangesTest {
         resultFromDisk.printSchema();
 
         resultFromDisk.show();
+    }
+
+    @Test
+    public void getMutationsByIndexTest(){
+        SparkSession spark = SparkSession.builder().appName("getMutationsByIndexTest").master("local[*]").getOrCreate();
+
+        Dataset df = ImportVcfToDataLakeByRanges.getMutationsByIndex(spark, "src/test/resources/input/*/hg19/");
+
+        df.printSchema();
+
+        df.show(false);
+
     }
 }

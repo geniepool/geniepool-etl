@@ -46,7 +46,7 @@ public class ImportVcfToDataLakeByRanges {
 
         tableWithImpact =  tableWithImpact
                 .groupBy("chrom", "pos","ref","alt", "impact")
-                .agg(collect_set("homo-srr").as("hom"), (collect_set("hetero-srr").as("het")));
+                .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
 
         tableWithImpact = tableWithImpact
                 .withColumn("resp", struct("ref", "alt", "impact", "hom", "het"))
@@ -67,7 +67,8 @@ public class ImportVcfToDataLakeByRanges {
                 .withColumn("homo", when(col("_c9").startsWith("1/1"), true).otherwise(false))
                 .withColumn("srr", split(reverse(split(input_file_name(), "/")).getItem(0), "\\.").getItem(0))
                 .withColumn("chrom", split(col("chrom"), "_").getItem(0))
-                .withColumn("pos", col("pos").cast(DataTypes.IntegerType));
+                .withColumn("pos", col("pos").cast(DataTypes.IntegerType))
+                .withColumn("qual", col("qual").cast(DataTypes.FloatType));
 
         table = table.drop("_c2", "_c5", "_c6", "_c7", "_c8", "_c9");
 
@@ -75,6 +76,11 @@ public class ImportVcfToDataLakeByRanges {
                 .withColumn("homo-srr", when(col("homo"), col("srr")))
                 .withColumn("hetero-srr", when(not(col("homo")), col("srr")))
                 .drop("homo");
+
+        table = table
+                .withColumn("hom-struct", when(col("homo-srr").isNotNull(), struct(col("homo-srr").as("id"), col("qual").as("qual"))))
+                .withColumn("het-struct", when(col("hetero-srr").isNotNull(), struct(col("hetero-srr").as("id"), col("qual").as("qual"))))
+                .drop("homo-srr", "hetero-srr", "srr", "qual");
 
         return table;
 
@@ -90,7 +96,9 @@ public class ImportVcfToDataLakeByRanges {
                 .withColumnRenamed("_c0", "chrom")
                 .withColumnRenamed("_c1", "pos")
                 .withColumnRenamed("_c3", "ref")
-                .withColumnRenamed("_c4", "alt");
+                .withColumnRenamed("_c4", "alt")
+                .withColumnRenamed("_c5", "qual")
+                ;
 
     }
 
