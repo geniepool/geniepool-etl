@@ -62,6 +62,29 @@ public class ImportVcfToDataLakeByRangesTest {
     }
 
     @Test
+    public void writeToDataLakeHg38Test(){
+
+        // used in tests in genetics-app !!!
+
+        SparkSession spark = SparkSession.builder().appName("writeToDataLakeHg38Test").master("local[*]").getOrCreate();
+
+        Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/", "src/test/resources/input/*/Impact/impacts.hg38.csv");
+
+        String outputPath = "target/test-out/" + UUID.randomUUID();
+
+        ImportVcfToDataLakeByRanges.writeToDataLake(result38, outputPath);
+
+        Dataset resultFromDisk = spark.read().parquet(outputPath);
+
+        Assert.assertEquals(result38.count(), resultFromDisk.count());
+
+        resultFromDisk.printSchema();
+
+        resultFromDisk.where("chrom='chr2' and pos >= 25234482 and pos <= 26501857").orderBy("pos").show(200, false);
+
+    }
+
+    @Test
     public void getStatusTest(){
         SparkSession spark = SparkSession.builder().appName("getStatusTest").master("local[*]").getOrCreate();
 
