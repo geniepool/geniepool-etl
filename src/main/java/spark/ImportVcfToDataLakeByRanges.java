@@ -12,6 +12,8 @@ import static org.apache.spark.sql.functions.*;
 
 public class ImportVcfToDataLakeByRanges {
 
+    private static final int PARTITION_SIZE = 100_000;
+    private static final int MAX_RECORDS_PER_FILE = 25_000;
 
     //todo add integration tests!
     public static void main(String[] args) {
@@ -51,7 +53,7 @@ public class ImportVcfToDataLakeByRanges {
                 .drop("hom", "het");
 
         tableWithImpact = tableWithImpact
-                .withColumn("pos_bucket", floor(col("pos").divide(lit(1_000_000))))
+                .withColumn("pos_bucket", floor(col("pos").divide(lit(PARTITION_SIZE))))
                 .groupBy("chrom", "pos_bucket", "pos").agg(collect_set(col("resp")).as("entries"));
 
         return tableWithImpact;
@@ -104,7 +106,9 @@ public class ImportVcfToDataLakeByRanges {
 
         df
                 .repartition(col("chrom"), col("pos_bucket"))
-                .write().mode("overwrite")
+                .write()
+                .option("maxRecordsPerFile", MAX_RECORDS_PER_FILE)
+                .mode("overwrite")
                 .partitionBy("chrom", "pos_bucket")
                 .parquet(outputPath);
 
