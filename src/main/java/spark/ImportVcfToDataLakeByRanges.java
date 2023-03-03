@@ -64,13 +64,15 @@ public class ImportVcfToDataLakeByRanges {
         Dataset raw = getRawInput(spark, inputPath);
 
         Dataset table = raw
-                .withColumn("homo", when(col("_c9").startsWith("1/1"), true).otherwise(false))
+                .withColumn("homo", when(col("last").startsWith("1/1"), true).otherwise(false))
                 .withColumn("srr", split(reverse(split(input_file_name(), "/")).getItem(0), "\\.").getItem(0))
                 .withColumn("chrom", split(col("chrom"), "_").getItem(0))
                 .withColumn("pos", col("pos").cast(DataTypes.IntegerType))
-                .withColumn("qual", col("qual").cast(DataTypes.FloatType));
+                .withColumn("qual", col("qual").cast(DataTypes.FloatType))
+                .withColumn("ad", split(col("last"), ":").getItem(1))
+                ;
 
-        table = table.drop("_c2", "_c5", "_c6", "_c7", "_c8", "_c9");
+        table = table.drop("_c2", "_c5", "_c6", "_c7", "_c8", "_c9", "last");
 
         table = table
                 .withColumn("homo-srr", when(col("homo"), col("srr")))
@@ -78,9 +80,9 @@ public class ImportVcfToDataLakeByRanges {
                 .drop("homo");
 
         table = table
-                .withColumn("hom-struct", when(col("homo-srr").isNotNull(), struct(col("homo-srr").as("id"), col("qual").as("qual"))))
-                .withColumn("het-struct", when(col("hetero-srr").isNotNull(), struct(col("hetero-srr").as("id"), col("qual").as("qual"))))
-                .drop("homo-srr", "hetero-srr", "srr", "qual");
+                .withColumn("hom-struct", when(col("homo-srr").isNotNull(), struct(col("homo-srr").as("id"), col("qual").as("qual"),col("ad").as("ad"))))
+                .withColumn("het-struct", when(col("hetero-srr").isNotNull(), struct(col("hetero-srr").as("id"), col("qual").as("qual"),col("ad").as("ad"))))
+                .drop("homo-srr", "hetero-srr", "srr", "qual", "ad");
 
         return table;
 
@@ -92,12 +94,15 @@ public class ImportVcfToDataLakeByRanges {
 
         Dataset table = spark.read().option("sep", "\t").csv(raw);
 
+        table.show();
+
         return table
                 .withColumnRenamed("_c0", "chrom")
                 .withColumnRenamed("_c1", "pos")
                 .withColumnRenamed("_c3", "ref")
                 .withColumnRenamed("_c4", "alt")
                 .withColumnRenamed("_c5", "qual")
+                .withColumnRenamed("_c9", "last")
                 ;
 
     }
