@@ -23,16 +23,23 @@ public class ImportVcfToDataLakeByRangesTest {
 
         SparkSession spark = SparkSession.builder().appName("convertVcfsToDatalakeFormatWithImpactTest").master("local[*]").getOrCreate();
 
-        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv");
+        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark,
+                "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv",
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv"
+        );
 
         Assert.assertEquals(1622, result19.count());
 
         Assert.assertEquals("we should keep only one impact", 1,
                 result19.where("chrom = 'chr1' and pos = 11301714").select(functions.size(functions.col("entries"))).as(Encoders.INT()).collectAsList().get(0));
 
-        result19.printSchema();
+        Assert.assertEquals("we should keep only one dbSNP", 1,
+                result19.where("chrom = 'chr1' and pos = 11301714").select(functions.size(functions.col("entries"))).as(Encoders.INT()).collectAsList().get(0));
 
-        result19.show(false);
+
+        Assert.assertTrue(
+                ((String)result19.where("chrom = 'chr1' and pos = 11301714")
+                        .select(functions.col("entries").cast(DataTypes.StringType)).as(Encoders.STRING()).collectAsList().get(0)).contains("impact"));
 
         Assert.assertTrue(
                 ((String)result19.where("chrom = 'chr1' and pos = 11301714")
@@ -45,7 +52,8 @@ public class ImportVcfToDataLakeByRangesTest {
 
         SparkSession spark = SparkSession.builder().appName("ImportVcfToDataLakeByRangesTest").master("local[*]").getOrCreate();
 
-        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv");
+        Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/",
+                "src/test/resources/input/*/Impact/impacts.hg19.csv", "src/test/resources/input/dbSNP/dbSNP.hg19.tsv");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -68,7 +76,8 @@ public class ImportVcfToDataLakeByRangesTest {
 
         SparkSession spark = SparkSession.builder().appName("writeToDataLakeHg38Test").master("local[*]").getOrCreate();
 
-        Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/", "src/test/resources/input/*/Impact/impacts.hg38.csv");
+        Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/",
+                "src/test/resources/input/*/Impact/impacts.hg38.csv","src/test/resources/input/dbSNP/dbSNP.hg38.tsv");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 

@@ -22,10 +22,11 @@ public class ImportVcfToDataLakeByRanges {
         String outputPath = args[1];
         String statusPath = args[2];
         String impactPath = args[3];
+        String dbSnpPath = args[4];
 
         SparkSession sparkSession = SparkSession.builder().appName(ImportVcfToDataLakeByRanges.class.getName()).getOrCreate();
 
-        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath);
+        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath);
 
         writeToDataLake(result, outputPath);
 
@@ -33,7 +34,7 @@ public class ImportVcfToDataLakeByRanges {
 
     }
 
-    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath){
+    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath, String dbSnpPath){
 
         Dataset table = getMutationsByIndex(spark, inputPath);
 
@@ -41,22 +42,34 @@ public class ImportVcfToDataLakeByRanges {
         impact = impact.withColumn("chrom", concat(lit("chr"), upper(col("chrom")))); //same format as in vcf
         impact = impact.dropDuplicates("chrom", "pos","ref","alt");
 
-        Dataset tableWithImpact = table.join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
-        tableWithImpact = tableWithImpact.withColumn("impact", trim(col("IMPACT")));
+        Dataset dbSnp = spark.read().option("sep", "\t").csv(dbSnpPath).where("not _c0 like '#%'");
 
-        tableWithImpact =  tableWithImpact
-                .groupBy("chrom", "pos","ref","alt", "impact")
+        dbSnp = dbSnp
+                .withColumn("chrom", concat(lit("chr"), upper(col("_c0")))).drop("_c0") //same format as in vcf
+                .withColumnRenamed("_c1", "pos")
+                .withColumnRenamed("_c2", "ref")
+                .withColumnRenamed("_c3", "alt")
+                .withColumnRenamed("_c4", "dbSNP");
+
+        Dataset result = table
+                .join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left")
+                .join(dbSnp, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
+
+        result = result.withColumn("impact", trim(col("IMPACT")));
+
+        result =  result
+                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP")
                 .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
 
-        tableWithImpact = tableWithImpact
-                .withColumn("resp", struct("ref", "alt", "impact", "hom", "het"))
+        result = result
+                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hom", "het"))
                 .drop("hom", "het");
 
-        tableWithImpact = tableWithImpact
+        result = result
                 .withColumn("pos_bucket", floor(col("pos").divide(lit(PARTITION_SIZE))))
                 .groupBy("chrom", "pos_bucket", "pos").agg(collect_set(col("resp")).as("entries"));
 
-        return tableWithImpact;
+        return result;
     }
 
     static Dataset getMutationsByIndex(SparkSession spark, String inputPath){
@@ -93,8 +106,6 @@ public class ImportVcfToDataLakeByRanges {
         Dataset raw = spark.read().textFile(inputPath).where("not value like '#%'");
 
         Dataset table = spark.read().option("sep", "\t").csv(raw);
-
-        table.show();
 
         return table
                 .withColumnRenamed("_c0", "chrom")
