@@ -25,7 +25,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark,
                 "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv"
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false
         );
 
         Assert.assertEquals(1622, result19.count());
@@ -53,7 +53,7 @@ public class ImportVcfToDataLakeByRangesTest {
         SparkSession spark = SparkSession.builder().appName("ImportVcfToDataLakeByRangesTest").master("local[*]").getOrCreate();
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/",
-                "src/test/resources/input/*/Impact/impacts.hg19.csv", "src/test/resources/input/dbSNP/dbSNP.hg19.tsv");
+                "src/test/resources/input/*/Impact/impacts.hg19.csv", "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false);
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -77,7 +77,7 @@ public class ImportVcfToDataLakeByRangesTest {
         SparkSession spark = SparkSession.builder().appName("writeToDataLakeHg38Test").master("local[*]").getOrCreate();
 
         Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/",
-                "src/test/resources/input/*/Impact/impacts.hg38.csv","src/test/resources/input/dbSNP/dbSNP.hg38.tsv");
+                "src/test/resources/input/*/Impact/impacts.hg38.csv","src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false);
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -90,6 +90,28 @@ public class ImportVcfToDataLakeByRangesTest {
         resultFromDisk.printSchema();
 
         resultFromDisk.where("chrom='chr2' and pos >= 25234482 and pos <= 26501857").orderBy("pos").show(200, false);
+
+    }
+
+    @Test
+    public void writeToDataLakeT2TTest(){
+
+        SparkSession spark = SparkSession.builder().appName("writeToDataLakeT2TTest").master("local[*]").getOrCreate();
+
+        Dataset resultT2T = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/CHM13V2/batches/*/chm13v2.0/*",
+                "src/test/resources/input/CHM13V2/Impact/*","src/test/resources/input/CHM13V2/dbSNP/*", true);
+
+        String outputPath = "target/test-out/" + UUID.randomUUID();
+
+        ImportVcfToDataLakeByRanges.writeToDataLake(resultT2T, outputPath);
+
+        Dataset resultFromDisk = spark.read().parquet(outputPath);
+
+        Assert.assertEquals(resultT2T.count(), resultFromDisk.count());
+
+        resultFromDisk.printSchema();
+
+        resultFromDisk.where("chrom='chr1' and pos = 805837").show( false);
 
     }
 

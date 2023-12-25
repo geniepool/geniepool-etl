@@ -23,10 +23,11 @@ public class ImportVcfToDataLakeByRanges {
         String statusPath = args[2];
         String impactPath = args[3];
         String dbSnpPath = args[4];
+        boolean t2t = Boolean.parseBoolean(args[5]);
 
         SparkSession sparkSession = SparkSession.builder().appName(ImportVcfToDataLakeByRanges.class.getName()).getOrCreate();
 
-        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath);
+        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath, t2t);
 
         writeToDataLake(result, outputPath);
 
@@ -34,7 +35,7 @@ public class ImportVcfToDataLakeByRanges {
 
     }
 
-    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath, String dbSnpPath){
+    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath, String dbSnpPath, boolean t2t){
 
         Dataset table = getMutationsByIndex(spark, inputPath);
 
@@ -42,14 +43,7 @@ public class ImportVcfToDataLakeByRanges {
         impact = impact.withColumn("chrom", concat(lit("chr"), upper(col("chrom")))); //same format as in vcf
         impact = impact.dropDuplicates("chrom", "pos","ref","alt");
 
-        Dataset dbSnp = spark.read().option("sep", "\t").csv(dbSnpPath).where("not _c0 like '#%'");
-
-        dbSnp = dbSnp
-                .withColumn("chrom", concat(lit("chr"), upper(col("_c0")))).drop("_c0") //same format as in vcf
-                .withColumnRenamed("_c1", "pos")
-                .withColumnRenamed("_c2", "ref")
-                .withColumnRenamed("_c3", "alt")
-                .withColumnRenamed("_c4", "dbSNP");
+        Dataset dbSnp = getDBSNP(spark, dbSnpPath, t2t);
 
         Dataset result = table
                 .join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left")
@@ -148,6 +142,32 @@ public class ImportVcfToDataLakeByRanges {
 
     static void writeStatus(Dataset df, String statusPath){
         df.coalesce(1).write().mode(SaveMode.Append).json(statusPath);
+    }
+
+    private static Dataset getDBSNP(SparkSession spark, String inputPath, boolean t2t){
+        Dataset result;
+
+        if (t2t){
+            result = spark.read().parquet(inputPath);
+
+            result = result
+                    .withColumnRenamed("POS", "pos")
+                    .withColumnRenamed("REF", "ref")
+                    .withColumnRenamed("ALT", "alt")
+                    .withColumnRenamed("SNP", "dbSNP")
+                    .withColumn("chrom", concat(lit("chr"), upper(col("CHROM"))));
+        }else{
+            result = spark.read().option("sep", "\t").csv(inputPath).where("not _c0 like '#%'");
+
+            result = result
+                    .withColumn("chrom", concat(lit("chr"), upper(col("_c0")))).drop("_c0") //same format as in vcf
+                    .withColumnRenamed("_c1", "pos")
+                    .withColumnRenamed("_c2", "ref")
+                    .withColumnRenamed("_c3", "alt")
+                    .withColumnRenamed("_c4", "dbSNP");
+        }
+
+        return result;
     }
 
 }
