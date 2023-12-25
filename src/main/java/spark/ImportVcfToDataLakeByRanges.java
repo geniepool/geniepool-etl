@@ -4,6 +4,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StringType;
 import scala.collection.JavaConversions;
 
 import java.util.Arrays;
@@ -24,10 +25,11 @@ public class ImportVcfToDataLakeByRanges {
         String impactPath = args[3];
         String dbSnpPath = args[4];
         boolean t2t = Boolean.parseBoolean(args[5]);
+        String gnomadPath = args[6];
 
         SparkSession sparkSession = SparkSession.builder().appName(ImportVcfToDataLakeByRanges.class.getName()).getOrCreate();
 
-        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath, t2t);
+        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath, t2t, gnomadPath);
 
         writeToDataLake(result, outputPath);
 
@@ -35,7 +37,8 @@ public class ImportVcfToDataLakeByRanges {
 
     }
 
-    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath, String dbSnpPath, boolean t2t){
+    static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath,
+                                                       String dbSnpPath, boolean t2t, String gnomAdPath){
 
         Dataset table = getMutationsByIndex(spark, inputPath);
 
@@ -49,14 +52,28 @@ public class ImportVcfToDataLakeByRanges {
                 .join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left")
                 .join(dbSnp, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
 
+        if (t2t){
+            Dataset gnomAd4 = spark.read().parquet(gnomAdPath);
+            gnomAd4 = gnomAd4
+                    .withColumnRenamed("POS", "pos")
+                    .withColumnRenamed("REF", "ref")
+                    .withColumnRenamed("ALT", "alt")
+                    .withColumn("chrom", concat(lit("chr"), upper(col("CHROM"))));
+            gnomAd4 = gnomAd4.select("chrom", "pos","ref","alt", "hg38");
+
+            result = result.join(gnomAd4, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
+        }else{
+            result = result.withColumn("hg38", lit(null).cast(DataTypes.StringType));
+        }
+
         result = result.withColumn("impact", trim(col("IMPACT")));
 
         result =  result
-                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP")
+                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "hg38")
                 .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
 
         result = result
-                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hom", "het"))
+                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hg38", "hom", "het"))
                 .drop("hom", "het");
 
         result = result

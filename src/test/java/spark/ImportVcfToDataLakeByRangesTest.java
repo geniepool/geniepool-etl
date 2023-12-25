@@ -25,7 +25,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark,
                 "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null
         );
 
         Assert.assertEquals(1622, result19.count());
@@ -53,7 +53,8 @@ public class ImportVcfToDataLakeByRangesTest {
         SparkSession spark = SparkSession.builder().appName("ImportVcfToDataLakeByRangesTest").master("local[*]").getOrCreate();
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/",
-                "src/test/resources/input/*/Impact/impacts.hg19.csv", "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false);
+                "src/test/resources/input/*/Impact/impacts.hg19.csv",
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null);
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -77,7 +78,8 @@ public class ImportVcfToDataLakeByRangesTest {
         SparkSession spark = SparkSession.builder().appName("writeToDataLakeHg38Test").master("local[*]").getOrCreate();
 
         Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/",
-                "src/test/resources/input/*/Impact/impacts.hg38.csv","src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false);
+                "src/test/resources/input/*/Impact/impacts.hg38.csv",
+                "src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false, null);
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -99,7 +101,8 @@ public class ImportVcfToDataLakeByRangesTest {
         SparkSession spark = SparkSession.builder().appName("writeToDataLakeT2TTest").master("local[*]").getOrCreate();
 
         Dataset resultT2T = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/CHM13V2/batches/*/chm13v2.0/*",
-                "src/test/resources/input/CHM13V2/Impact/*","src/test/resources/input/CHM13V2/dbSNP/*", true);
+                "src/test/resources/input/CHM13V2/Impact/*","src/test/resources/input/CHM13V2/dbSNP/*", true,
+                "src/test/resources/input/CHM13V2/gnomAD4/*");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -113,6 +116,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         resultFromDisk.where("chrom='chr1' and pos = 805837").show( false);
 
+        resultFromDisk.where("chrom='chr1' and pos = 730107").show( false);
     }
 
     @Test
