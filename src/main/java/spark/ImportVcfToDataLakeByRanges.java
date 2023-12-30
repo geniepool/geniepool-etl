@@ -58,22 +58,23 @@ public class ImportVcfToDataLakeByRanges {
                     .withColumnRenamed("POS", "pos")
                     .withColumnRenamed("REF", "ref")
                     .withColumnRenamed("ALT", "alt")
+                    .withColumnRenamed("hg38", "hg38_coordinate")
                     .withColumn("chrom", concat(lit("chr"), upper(col("CHROM"))));
-            gnomAd4 = gnomAd4.select("chrom", "pos","ref","alt", "hg38");
+            gnomAd4 = gnomAd4.select("chrom", "pos","ref","alt", "hg38_coordinate");
 
             result = result.join(gnomAd4, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
         }else{
-            result = result.withColumn("hg38", lit(null).cast(DataTypes.StringType));
+            result = result.withColumn("hg38_coordinate", lit(null).cast(DataTypes.StringType));
         }
 
         result = result.withColumn("impact", trim(col("IMPACT")));
 
         result =  result
-                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "hg38")
+                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "hg38_coordinate")
                 .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
 
         result = result
-                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hg38", "hom", "het"))
+                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hg38_coordinate", "hom", "het"))
                 .drop("hom", "het");
 
         result = result
