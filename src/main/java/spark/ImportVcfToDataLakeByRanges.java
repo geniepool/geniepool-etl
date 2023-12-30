@@ -4,7 +4,6 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StringType;
 import scala.collection.JavaConversions;
 
 import java.util.Arrays;
@@ -26,10 +25,11 @@ public class ImportVcfToDataLakeByRanges {
         String dbSnpPath = args[4];
         boolean t2t = Boolean.parseBoolean(args[5]);
         String gnomadPath = args[6];
+        String alphaPath = args[7];
 
         SparkSession sparkSession = SparkSession.builder().appName(ImportVcfToDataLakeByRanges.class.getName()).getOrCreate();
 
-        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath, t2t, gnomadPath);
+        Dataset result = convertVcfsToDatalakeFormatByRanges(sparkSession, inputPath, impactPath, dbSnpPath, t2t, gnomadPath, alphaPath);
 
         writeToDataLake(result, outputPath);
 
@@ -38,7 +38,7 @@ public class ImportVcfToDataLakeByRanges {
     }
 
     static Dataset convertVcfsToDatalakeFormatByRanges(SparkSession spark, String inputPath, String impactPath,
-                                                       String dbSnpPath, boolean t2t, String gnomAdPath){
+                                                       String dbSnpPath, boolean t2t, String gnomAdPath, String alphaPath){
 
         Dataset table = getMutationsByIndex(spark, inputPath);
 
@@ -69,12 +69,14 @@ public class ImportVcfToDataLakeByRanges {
 
         result = result.withColumn("impact", trim(col("IMPACT")));
 
+        result = addAlpha(result, alphaPath);
+
         result =  result
-                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "hg38_coordinate")
+                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "hg38_coordinate", "alphamissense")
                 .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
 
         result = result
-                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hg38_coordinate", "hom", "het"))
+                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hg38_coordinate", "alphamissense", "hom", "het"))
                 .drop("hom", "het");
 
         result = result
@@ -188,4 +190,40 @@ public class ImportVcfToDataLakeByRanges {
         return result;
     }
 
+    static Dataset addAlpha(Dataset df, String alphaPath){
+
+        Dataset alpha = df.sparkSession().read().parquet(alphaPath);
+
+        alpha = alpha
+                .withColumn("chrom", concat(lit("chr"),
+                        upper(substring_index(reverse(substring_index(reverse(input_file_name()), "/", 1)), ".", 1))))
+                .withColumnRenamed("POS", "pos");
+
+        Dataset result = df.join(alpha, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos")), "left");
+
+        result = result.withColumn("alphamissense",
+                when(col("ref").equalTo("C").and(col("C").equalTo(0).and(col("alt").equalTo("T"))), col("T")).
+                        when(col("ref").equalTo("C").and(col("C").equalTo(0).and(col("alt").equalTo("A"))), col("A")).
+                        when(col("ref").equalTo("C").and(col("C").equalTo(0).and(col("alt").equalTo("G"))), col("G")).
+
+                        when(col("ref").equalTo("A").and(col("A").equalTo(0).and(col("alt").equalTo("C"))), col("C")).
+                        when(col("ref").equalTo("A").and(col("A").equalTo(0).and(col("alt").equalTo("T"))), col("T")).
+                        when(col("ref").equalTo("A").and(col("A").equalTo(0).and(col("alt").equalTo("G"))), col("G")).
+
+                        when(col("ref").equalTo("T").and(col("T").equalTo(0).and(col("alt").equalTo("A"))), col("A")).
+                        when(col("ref").equalTo("T").and(col("T").equalTo(0).and(col("alt").equalTo("C"))), col("C")).
+                        when(col("ref").equalTo("T").and(col("T").equalTo(0).and(col("alt").equalTo("G"))), col("G")).
+
+                        when(col("ref").equalTo("G").and(col("G").equalTo(0).and(col("alt").equalTo("A"))), col("A")).
+                        when(col("ref").equalTo("G").and(col("G").equalTo(0).and(col("alt").equalTo("C"))), col("C")).
+                        when(col("ref").equalTo("G").and(col("G").equalTo(0).and(col("alt").equalTo("T"))), col("T"))
+        );
+
+        result = result.withColumn("alphamissense", when(col("impact").equalTo("missense"), col("alphamissense")));
+
+        result = result.select("alphamissense", df.columns());
+
+        return result;
+
+    }
 }

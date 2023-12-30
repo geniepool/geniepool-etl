@@ -1,3 +1,3 @@
 CHROM	POS	REF	ALT	IMPACT
-1	11301714	A	G	impact X test
-1	45796269	G	C	impact Y test
+1	11301714	A	G	missense
+1	45796269	G	C	missense

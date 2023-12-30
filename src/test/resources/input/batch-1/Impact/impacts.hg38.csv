@@ -1,3 +1,4 @@
 CHROM	POS	REF	ALT	IMPACT
 2	25234482	C	T	impact 1 test
 2	25235677	C	T	impact 2 test
+1	162778659	C	T	missense

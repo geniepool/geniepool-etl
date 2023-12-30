@@ -14,6 +14,8 @@ import java.util.UUID;
 
 public class ImportVcfToDataLakeByRangesTest {
 
+    //TODO add assertions!!!
+
     static{
         Logger.getLogger("org.apache").setLevel(Level.WARN);
     }
@@ -25,25 +27,21 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark,
                 "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null, "src/test/resources/input/alpha/hg-19/"
         );
+
+        result19.printSchema();
+
+        result19.show(false);
 
         Assert.assertEquals(1622, result19.count());
 
         Assert.assertEquals("we should keep only one impact", 1,
                 result19.where("chrom = 'chr1' and pos = 11301714").select(functions.size(functions.col("entries"))).as(Encoders.INT()).collectAsList().get(0));
 
-        Assert.assertEquals("we should keep only one dbSNP", 1,
-                result19.where("chrom = 'chr1' and pos = 11301714").select(functions.size(functions.col("entries"))).as(Encoders.INT()).collectAsList().get(0));
-
-
         Assert.assertTrue(
                 ((String)result19.where("chrom = 'chr1' and pos = 11301714")
-                        .select(functions.col("entries").cast(DataTypes.StringType)).as(Encoders.STRING()).collectAsList().get(0)).contains("impact"));
-
-        Assert.assertTrue(
-                ((String)result19.where("chrom = 'chr1' and pos = 11301714")
-                        .select(functions.col("entries").cast(DataTypes.StringType)).as(Encoders.STRING()).collectAsList().get(0)).contains("impact"));
+                        .select(functions.col("entries").cast(DataTypes.StringType)).as(Encoders.STRING()).collectAsList().get(0)).contains("missense"));
 
     }
 
@@ -54,7 +52,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/",
                 "src/test/resources/input/*/Impact/impacts.hg19.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null);
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null, "src/test/resources/input/alpha/hg-19/");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -79,7 +77,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/",
                 "src/test/resources/input/*/Impact/impacts.hg38.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false, null);
+                "src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false, null, "src/test/resources/input/alpha/hg-38/");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -93,6 +91,8 @@ public class ImportVcfToDataLakeByRangesTest {
 
         resultFromDisk.where("chrom='chr2' and pos >= 25234482 and pos <= 26501857").orderBy("pos").show(200, false);
 
+        resultFromDisk.where("chrom='chr1' and pos = 162778659").orderBy("pos").show( false);
+
     }
 
     @Test
@@ -102,7 +102,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset resultT2T = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/CHM13V2/batches/*/chm13v2.0/*",
                 "src/test/resources/input/CHM13V2/Impact/*","src/test/resources/input/CHM13V2/dbSNP/*", true,
-                "src/test/resources/input/CHM13V2/gnomAD4/*");
+                "src/test/resources/input/CHM13V2/gnomAD4/*", "src/test/resources/input/alpha/chm13-v2/");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -117,6 +117,8 @@ public class ImportVcfToDataLakeByRangesTest {
         resultFromDisk.where("chrom='chr1' and pos = 805837").show( false);
 
         resultFromDisk.where("chrom='chr1' and pos = 730107").show( false);
+
+        resultFromDisk.where("chrom='chr1' and pos = 774091").show( false);
     }
 
     @Test
