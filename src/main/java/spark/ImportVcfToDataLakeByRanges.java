@@ -219,8 +219,6 @@ public class ImportVcfToDataLakeByRanges {
                         when(col("ref").equalTo("G").and(col("G").equalTo(0).and(col("alt").equalTo("T"))), col("T"))
         );
 
-        result = result.withColumn("alphamissense", when(col("impact").equalTo("missense"), col("alphamissense")));
-
         result = result.select("alphamissense", df.columns());
 
         return result;
