@@ -4,11 +4,14 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import scala.collection.JavaConversions;
 
 import java.util.Arrays;
 
 import static org.apache.spark.sql.functions.*;
+import static org.apache.spark.sql.types.DataTypes.createStructField;
 
 public class ImportVcfToDataLakeByRanges {
 
@@ -53,13 +56,32 @@ public class ImportVcfToDataLakeByRanges {
                 .join(dbSnp, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
 
         if (t2t){
-            Dataset gnomAd4 = spark.read().parquet(gnomAdPath);
+
+            StructType schema = DataTypes.createStructType(new StructField[]{
+                    createStructField("POS", DataTypes.LongType, true),
+                    createStructField("REF", DataTypes.StringType, true),
+                    createStructField("ALT", DataTypes.StringType, true),
+                    createStructField("hg38", DataTypes.StringType, true),
+            });
+
+            Dataset gnomAd4 = spark.read().schema(schema).parquet(gnomAdPath);
+
+            gnomAd4 = gnomAd4.withColumn("chrom", concat(lit("chr"),
+                            upper(
+                                    regexp_replace(substring_index(
+                                            substring_index(reverse(substring_index(reverse(input_file_name()), "/", 1)), ".", 1),
+                                            "_", 1
+                                    ), "c", "")
+                            )
+                    )
+            );
+
             gnomAd4 = gnomAd4
                     .withColumnRenamed("POS", "pos")
                     .withColumnRenamed("REF", "ref")
                     .withColumnRenamed("ALT", "alt")
-                    .withColumnRenamed("hg38", "hg38_coordinate")
-                    .withColumn("chrom", concat(lit("chr"), upper(col("CHROM"))));
+                    .withColumnRenamed("hg38", "hg38_coordinate");
+
             gnomAd4 = gnomAd4.select("chrom", "pos","ref","alt", "hg38_coordinate");
 
             result = result.join(gnomAd4, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
@@ -168,14 +190,30 @@ public class ImportVcfToDataLakeByRanges {
         Dataset result;
 
         if (t2t){
-            result = spark.read().parquet(inputPath);
+            StructType schema = DataTypes.createStructType(new StructField[]{
+                    createStructField("POS", DataTypes.LongType, true),
+                    createStructField("REF", DataTypes.StringType, true),
+                    createStructField("ALT", DataTypes.StringType, true),
+                    createStructField("SNP", DataTypes.StringType, true),
+            });
+
+            result = spark.read().schema(schema).parquet(inputPath);
+
+            result = result.withColumn("chrom", concat(lit("chr"),
+                    upper(
+                            regexp_replace(substring_index(
+                                    substring_index(reverse(substring_index(reverse(input_file_name()), "/", 1)), ".", 1),
+                                    "_", 1
+                            ), "c", "")
+                    )
+                    )
+            );
 
             result = result
                     .withColumnRenamed("POS", "pos")
                     .withColumnRenamed("REF", "ref")
                     .withColumnRenamed("ALT", "alt")
-                    .withColumnRenamed("SNP", "dbSNP")
-                    .withColumn("chrom", concat(lit("chr"), upper(col("CHROM"))));
+                    .withColumnRenamed("SNP", "dbSNP");
         }else{
             result = spark.read().option("sep", "\t").csv(inputPath).where("not _c0 like '#%'");
 
