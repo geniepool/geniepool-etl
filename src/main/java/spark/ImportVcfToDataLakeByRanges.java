@@ -55,50 +55,20 @@ public class ImportVcfToDataLakeByRanges {
                 .join(impact, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left")
                 .join(dbSnp, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
 
-        if (t2t){
-
-            StructType schema = DataTypes.createStructType(new StructField[]{
-                    createStructField("POS", DataTypes.LongType, true),
-                    createStructField("REF", DataTypes.StringType, true),
-                    createStructField("ALT", DataTypes.StringType, true),
-                    createStructField("hg38", DataTypes.StringType, true),
-            });
-
-            Dataset gnomAd4 = spark.read().schema(schema).parquet(gnomAdPath);
-
-            gnomAd4 = gnomAd4.withColumn("chrom", concat(lit("chr"),
-                            upper(
-                                    regexp_replace(substring_index(
-                                            substring_index(reverse(substring_index(reverse(input_file_name()), "/", 1)), ".", 1),
-                                            "_", 1
-                                    ), "c", "")
-                            )
-                    )
-            );
-
-            gnomAd4 = gnomAd4
-                    .withColumnRenamed("POS", "pos")
-                    .withColumnRenamed("REF", "ref")
-                    .withColumnRenamed("ALT", "alt")
-                    .withColumnRenamed("hg38", "hg38_coordinate");
-
-            gnomAd4 = gnomAd4.select("chrom", "pos","ref","alt", "hg38_coordinate");
-
-            result = result.join(gnomAd4, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
-        }else{
-            result = result.withColumn("hg38_coordinate", lit(null).cast(DataTypes.StringType));
-        }
+        result = addGnomAd(gnomAdPath, result);
 
         result = result.withColumn("impact", trim(col("IMPACT")));
 
         result = addAlpha(result, alphaPath);
 
         result =  result
-                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "hg38_coordinate", "alphamissense")
+                .groupBy("chrom", "pos","ref","alt", "impact", "dbSNP", "gnomad_an", "gnomad_ac", "gnomad_nhomalt", "hg38_coordinate", "alphamissense")
                 .agg(collect_set("hom-struct").as("hom"), (collect_set("het-struct").as("het")));
 
         result = result
-                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP", "hg38_coordinate", "alphamissense", "hom", "het"))
+                .withColumn("resp", struct("ref", "alt", "impact", "dbSNP",
+                        "gnomad_an", "gnomad_ac", "gnomad_nhomalt",
+                        "hg38_coordinate", "alphamissense", "hom", "het"))
                 .drop("hom", "het");
 
         result = result
@@ -262,4 +232,38 @@ public class ImportVcfToDataLakeByRanges {
         return result;
 
     }
+
+    private static Dataset addGnomAd(String gnomAdPath, Dataset df){
+
+        StructType schema = DataTypes.createStructType(new StructField[]{
+                createStructField("POS", DataTypes.LongType, true),
+                createStructField("REF", DataTypes.StringType, true),
+                createStructField("ALT", DataTypes.StringType, true),
+                createStructField("gnomad_an", DataTypes.LongType, true),
+                createStructField("gnomad_ac", DataTypes.LongType, true),
+                createStructField("gnomad_nhomalt", DataTypes.LongType, true),
+                createStructField("hg38_coordinates", DataTypes.StringType, true)
+        });
+
+        Dataset gnomAd4 = df.sparkSession().read().schema(schema).parquet(gnomAdPath);
+
+        gnomAd4 = gnomAd4.withColumn("chrom", concat(lit("chr"),
+                        upper(
+                                regexp_replace(substring_index(
+                                        substring_index(reverse(substring_index(reverse(input_file_name()), "/", 1)), ".", 1),
+                                        "_", 1
+                                ), "c", "")
+                        )
+                )
+        );
+
+        gnomAd4 = gnomAd4
+                .withColumnRenamed("POS", "pos")
+                .withColumnRenamed("REF", "ref")
+                .withColumnRenamed("ALT", "alt")
+                .withColumnRenamed("hg38_coordinates", "hg38_coordinate");
+
+        return df.join(gnomAd4, JavaConversions.asScalaBuffer(Arrays.asList("chrom", "pos","ref","alt")), "left");
+    }
+
 }

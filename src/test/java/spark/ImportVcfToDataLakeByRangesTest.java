@@ -27,7 +27,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark,
                 "src/test/resources/input/*/hg19/", "src/test/resources/input/*/Impact/impacts.hg19.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null, "src/test/resources/input/alpha/hg-19/"
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, "src/test/resources/input/gnomad/hg-38", "src/test/resources/input/alpha/hg-19/"
         );
 
         result19.printSchema();
@@ -52,7 +52,7 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result19 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg19/",
                 "src/test/resources/input/*/Impact/impacts.hg19.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, null, "src/test/resources/input/alpha/hg-19/");
+                "src/test/resources/input/dbSNP/dbSNP.hg19.tsv", false, "src/test/resources/input/gnomad/hg-38", "src/test/resources/input/alpha/hg-19/");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
@@ -77,7 +77,8 @@ public class ImportVcfToDataLakeByRangesTest {
 
         Dataset result38 = ImportVcfToDataLakeByRanges.convertVcfsToDatalakeFormatByRanges(spark, "src/test/resources/input/*/hg38/",
                 "src/test/resources/input/*/Impact/impacts.hg38.csv",
-                "src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false, null, "src/test/resources/input/alpha/hg-38/");
+                "src/test/resources/input/dbSNP/dbSNP.hg38.tsv", false,
+                "src/test/resources/input/gnomad/hg-38", "src/test/resources/input/alpha/hg-38/");
 
         String outputPath = "target/test-out/" + UUID.randomUUID();
 
